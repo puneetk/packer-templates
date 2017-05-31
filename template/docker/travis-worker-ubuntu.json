@@ -1,0 +1,87 @@
+{
+  "_comment": "Build with `packer build -var-file=travis_docker/variables.json template/docker/travis-worker-ubuntu.json`",
+  "builders": [
+    {
+      "commit": true,
+      "run_command": [
+        "-d",
+        "-i",
+        "-t",
+        "--privileged=true",
+        "{{.Image}}",
+        "/sbin/init"
+      ],
+      "image": "ubuntu-upstart:14.04",
+      "ssh_pty": true,
+      "name": "docker",
+      "type": "docker"
+    }
+  ],
+  "post-processors": [
+    {
+      "type": "docker-tag",
+      "tag": "{{user `version`}}",
+      "only": ["docker"],
+      "repository": "{{user `repository` }}/{{user `vm_name`}}",
+      "force": true
+    },
+    {
+      "path": "build/docker/{{user `vm_name`}}-{{user `version`}}.tar",
+      "type": "docker-save"
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "file",
+      "source": "assets/docker/travis-worker-package-list",
+      "destination": "/var/tmp/package-list"
+    },
+    {
+      "environment_vars": [
+        "http_proxy={{user `http_proxy`}}",
+        "https_proxy={{user `https_proxy`}}",
+        "ftp_proxy={{user `ftp_proxy`}}",
+        "rsync_proxy={{user `rsync_proxy`}}",
+        "no_proxy={{user `no_proxy`}}",
+        "SERVER_NAME={{user `vm_name`}}"
+      ],
+      "scripts": [
+        "script/configure-travis-worker"
+      ],
+      "execute_command": "{{ .Vars }} exec sudo -E -S bash '{{ .Path }}'",
+      "type": "shell"
+    },
+    {
+      "scripts": [
+        "{{user `custom_script`}}"
+      ],
+      "type": "shell"
+    },
+    {
+      "type": "file",
+      "source": "assets/docker/run.py",
+      "destination": "/home/travis/run.py"
+    },
+    {
+      "type": "file",
+      "source": "assets/docker/run-stage2.py",
+      "destination": "/home/travis/run-stage2.py"
+    }
+  ],
+  "variables": {
+    "update": "false",
+    "ssh_username": "vagrant",
+    "headless": "true",
+    "cpus": "1",
+    "custom_script": "script/custom-script",
+    "vm_name": "ubuntu1404",
+    "version": "0.1.1",
+    "disk_size": "65536",
+    "docker": "false",
+    "preseed": "",
+    "hostname": "vagrant",
+    "ssh_fullname": "vagrant",
+    "ssh_password": "vagrant",
+    "repository": "sysops"
+  }
+}
